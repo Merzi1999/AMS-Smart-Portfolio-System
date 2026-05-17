@@ -1,0 +1,206 @@
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-8">
+
+  <!-- Header & Toolbar Section -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+      <!-- Title -->
+      <div>
+        <h2 class="text-2xl font-display font-bold text-slate-800 flex items-center gap-2">
+          <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+            </path>
+          </svg>
+          จัดการข้อมูล
+        </h2>
+        <p class="text-sm text-slate-500 mt-1">รายการผลงานทั้งหมด
+          <span id="total-records" class="font-semibold text-primary-600">0</span> รายการ</p>
+      </div>
+
+      <!-- Action & Search -->
+      <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        <!-- Search Box -->
+        <div class="relative group w-full md:w-64">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-slate-400 group-focus-within:text-primary-500 transition-colors" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input type="text" id="app-search" onkeyup="filterAppList()"
+            class="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all shadow-sm"
+            placeholder="ค้นหาชื่อ, ประเภท...">
+        </div>
+
+        <!-- Add Button (Desktop) -->
+        <button onclick="openModal()" class="hidden md:inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-medium rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          เพิ่มรายการ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT AREA -->
+
+  <!-- 1. Mobile List View (Visible on Small Screens) -->
+  <div class="md:hidden space-y-4" id="app-mobile-list">
+    <!-- Card Item Template (JS Will Inject Here) -->
+    <div class="animate-pulse flex flex-col gap-4">
+      <div class="h-32 bg-slate-200 rounded-2xl"></div>
+      <div class="h-32 bg-slate-200 rounded-2xl"></div>
+    </div>
+  </div>
+
+  <!-- 2. Desktop Table View (Visible on Medium+ Screens) -->
+  <div class="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-100">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">รูปภาพ</th>
+            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              รายละเอียดผลงาน</th>
+            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ประเภท/ระดับ
+            </th>
+            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">วันที่</th>
+            <th class="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-slate-100" id="app-table-body">
+          <!-- Rows Will Inject Here -->
+        </tbody>
+      </table>
+    </div>
+    <!-- Empty State for Table -->
+    <div id="table-empty-state" class="hidden py-12 text-center">
+      <p class="text-slate-400">ไม่พบข้อมูลที่ค้นหา</p>
+    </div>
+  </div>
+
+  <!-- Floating Action Button (Mobile Only) -->
+  <button onclick="openModal()" class="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-full shadow-lg shadow-primary-500/40 flex items-center justify-center active:scale-95 transition-transform z-40">
+    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+  </button>
+
+</div>
+
+<!-- FULL SCREEN MODAL (Responsive) -->
+<div id="form-modal" class="fixed inset-0 z-[70] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog"
+  aria-modal="true">
+  <div class="flex items-end sm:items-center justify-center min-h-screen text-center sm:p-4">
+
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity" aria-hidden="true"
+      onclick="closeModal()"></div>
+
+    <!-- Modal Panel -->
+    <div
+      class="relative inline-block align-bottom bg-white w-full h-full sm:h-auto sm:rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:max-w-2xl sm:align-middle flex flex-col">
+
+      <!-- Modal Header -->
+      <div class="bg-white px-6 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 z-10">
+        <div>
+          <h3 class="text-lg font-bold text-slate-800" id="modal-title">เพิ่มข้อมูลรางวัล</h3>
+          <p class="text-xs text-slate-500">กรอกข้อมูลให้ครบถ้วน</p>
+        </div>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+        <form id="achievement-form" onsubmit="handleFormSubmit(event)" class="space-y-6">
+          <input type="hidden" name="id" id="inp-id">
+          <input type="hidden" name="currentImageId" id="inp-currentImageId">
+
+          <!-- Image Uploader (Modern Style) -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <label class="block text-sm font-medium text-slate-700 mb-3">รูปภาพผลงาน</label>
+            <label for="inp-file" class="relative flex flex-col items-center justify-center w-full h-56 border-2 border-primary-200 border-dashed rounded-xl cursor-pointer bg-primary-50/30 hover:bg-primary-50 transition-colors group overflow-hidden">
+
+              <!-- Placeholder -->
+              <div id="upload-placeholder" class="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                <div class="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <p class="text-sm text-slate-600 font-medium">แตะเพื่ออัปโหลดรูปภาพ</p>
+                <p class="text-xs text-slate-400 mt-1">PNG, JPG (แนะนำแนวนอน)</p>
+              </div>
+
+              <!-- Preview -->
+              <img id="img-preview" class="absolute inset-0 w-full h-full object-contain hidden bg-slate-100" />
+              
+              <!-- Edit Overlay -->
+              <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <span class="bg-white/20 backdrop-blur text-white px-3 py-1 rounded-full text-sm font-medium border border-white/30">เปลี่ยนรูปภาพ</span>
+              </div>
+
+              <input id="inp-file" type="file" class="hidden" accept="image/*" onchange="previewImage(this)" />
+            </label>
+          </div>
+
+          <!-- Fields Group -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อรางวัล / ผลงาน <span class="text-red-500">*</span></label>
+              <input type="text" id="inp-title" name="title" required class="block w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-slate-50 focus:bg-white transition-colors">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">ประเภท</label>
+                <div class="relative">
+                  <select id="inp-category" name="category" class="...">
+         </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">ระดับรางวัล</label>
+                <div class="relative">
+                  <select id="inp-level" name="level" class="...">
+         </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">ปีการศึกษา</label>
+                <input type="number" id="inp-academic-year" name="academicYear" required
+           class="block w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 appearance-none bg-slate-50 focus:bg-white"
+           placeholder="2568">
+              </div>
+
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">เจ้าของผลงาน</label>
+              <input type="text" id="inp-owner" name="ownerName" required placeholder="เช่น เด็กชายรักเรียน..." class="block w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-slate-50 focus:bg-white">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">วันที่ได้รับรางวัล</label>
+              <input type="date" id="inp-date" name="date" required class="block w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-slate-50 focus:bg-white">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">รายละเอียด (ถ้ามี)</label>
+              <textarea id="inp-desc" name="description" rows="3" class="block w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-slate-50 focus:bg-white"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Modal Footer -->
+      <div
+        class="bg-white px-6 py-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sticky bottom-0 z-10">
+        <button type="button" onclick="closeModal()" class="w-full sm:w-auto px-5 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl font-medium transition-colors">ยกเลิก</button>
+        <button onclick="document.getElementById('achievement-form').requestSubmit()" class="w-full sm:w-auto px-5 py-2.5 bg-primary-600 text-white hover:bg-primary-700 rounded-xl font-medium shadow-md shadow-primary-500/30 transition-all transform active:scale-95">บันทึกข้อมูล</button>
+      </div>
+
+    </div>
+  </div>
+</div>

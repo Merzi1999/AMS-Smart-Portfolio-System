@@ -1,0 +1,208 @@
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
+  
+  <!-- 1. Header Section (Greetings) -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-fade-in-up">
+    <div>
+      <p class="text-sm font-medium text-slate-500 mb-1" id="dash-date">ว/ด/ป</p>
+      <h2 class="text-3xl font-display font-bold text-slate-800 flex items-center gap-2">
+        <span id="dash-greeting">สวัสดี</span>, 
+        <span class="text-primary-600" id="dash-user-name">คุณครู</span>
+        <span class="text-2xl">👋</span>
+      </h2>
+    </div>
+    <div class="hidden md:block">
+      <span id="dash-term-year" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-100">
+        ภาคเรียนที่ -/-
+      </span>
+    </div>
+  </div>
+
+  <!-- 2. Quick Actions (App Style Buttons) -->
+  <div class="mb-8">
+    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 px-1">เมนูด่วน</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      
+      <!-- Button: Add New -->
+      <button onclick="openModal('add')" class="group relative flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-primary-200 transition-all active:scale-95">
+        <div class="w-12 h-12 mb-3 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-200 group-hover:scale-110 transition-transform">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        </div>
+        <span class="text-sm font-bold text-slate-700">บันทึกผลงาน</span>
+        <span class="text-xs text-slate-400 mt-1">เพิ่มข้อมูลใหม่</span>
+      </button>
+
+      <!-- Button: My Portfolio (UPDATED) -->
+      <button onclick="filterMyPortfolio()" class="group relative flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-200 transition-all active:scale-95">
+        <div class="w-12 h-12 mb-3 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        </div>
+        <span class="text-sm font-bold text-slate-700">ผลงานของฉัน</span>
+        <span class="text-xs text-slate-400 mt-1">ดูรายการที่บันทึก</span>
+      </button>
+
+      <!-- Button: National Awards -->
+      <button onclick="filterGallery('ระดับชาติ'); navigateTo('landing'); setTimeout(scrollToGallery, 100);" class="group relative flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-amber-200 transition-all active:scale-95">
+        <div class="w-12 h-12 mb-3 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-200 group-hover:scale-110 transition-transform">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+        </div>
+        <span class="text-sm font-bold text-slate-700">ระดับชาติ</span>
+        <span class="text-xs text-slate-400 mt-1">ดูรางวัลสูงสุด</span>
+      </button>
+
+      <!-- Button: Settings/Profile (UPDATED) -->
+      <button onclick="openProfileModal()" class="group relative flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-200 transition-all active:scale-95">
+        <div class="w-12 h-12 mb-3 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200 group-hover:scale-110 transition-transform">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        </div>
+        <span class="text-sm font-bold text-slate-700">โปรไฟล์</span>
+        <span class="text-xs text-slate-400 mt-1">ตั้งค่าบัญชี</span>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- 3. Statistics Cards (Detailed) -->
+  <div class="mb-8">
+    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 px-1">ภาพรวมสถิติ</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Card 1: Total -->
+      <div class="relative overflow-hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group">
+        <div class="absolute right-0 top-0 w-32 h-32 bg-blue-50 rounded-full mix-blend-multiply filter blur-2xl opacity-70 -mr-8 -mt-8"></div>
+        <div class="relative flex justify-between items-start">
+          <div>
+            <p class="text-slate-500 text-sm font-medium mb-1">ผลงานทั้งหมด</p>
+            <h3 class="text-3xl font-display font-bold text-slate-800" id="stat-total-count">0</h3>
+            <span class="inline-flex items-center mt-2 px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">
+              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+              Active
+            </span>
+          </div>
+          <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: My Works -->
+      <div class="relative overflow-hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group">
+        <div class="absolute right-0 top-0 w-32 h-32 bg-green-50 rounded-full mix-blend-multiply filter blur-2xl opacity-70 -mr-8 -mt-8"></div>
+        <div class="relative flex justify-between items-start">
+          <div>
+            <p class="text-slate-500 text-sm font-medium mb-1">ผลงานของฉัน</p>
+            <h3 class="text-3xl font-display font-bold text-slate-800" id="stat-my-count">0</h3>
+            <p class="text-xs text-slate-400 mt-2">รายการที่คุณบันทึกเข้าระบบ</p>
+          </div>
+          <div class="p-3 bg-green-50 text-green-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: National -->
+      <div class="relative overflow-hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-100 group">
+        <div class="absolute right-0 top-0 w-32 h-32 bg-amber-50 rounded-full mix-blend-multiply filter blur-2xl opacity-70 -mr-8 -mt-8"></div>
+        <div class="relative flex justify-between items-start">
+          <div>
+            <p class="text-slate-500 text-sm font-medium mb-1">ระดับชาติขึ้นไป</p>
+            <h3 class="text-3xl font-display font-bold text-slate-800" id="stat-national-count">0</h3>
+            <p class="text-xs text-slate-400 mt-2">ความเป็นเลิศขององค์กร</p>
+          </div>
+          <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 4. Content Grid: Chart & Recent -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Chart Section -->
+    <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-100 lg:col-span-2">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-lg font-bold text-slate-800">สัดส่วนผลงาน</h3>
+        <button class="text-slate-400 hover:text-primary-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+        </button>
+      </div>
+      <div class="h-64 w-full flex justify-center items-center">
+        <canvas id="dashboardChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Recent Activity Section (Timeline Style) -->
+    <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-100 flex flex-col h-full">
+      <h3 class="text-lg font-bold text-slate-800 mb-6">รายการล่าสุด</h3>
+      <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+        <ul class="space-y-0 relative border-l border-slate-200 ml-3" id="recent-activity-list">
+          <!-- JS will inject timeline items here -->
+          <li class="pl-6 pb-6 relative">
+            <span class="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-slate-200 border-2 border-white"></span>
+            <p class="text-sm text-slate-400">กำลังโหลด...</p>
+          </li>
+        </ul>
+      </div>
+      <button onclick="navigateTo('app')" class="w-full mt-4 py-2 text-sm text-primary-600 font-medium bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors">
+        ดูทั้งหมด
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Inline Script for Dashboard Specific UI Logic (Time & Greeting) -->
+  <script>
+    (function() {
+      // 1. Update Date
+      const dateEl = document.getElementById('dash-date');
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      if(dateEl) dateEl.innerText = now.toLocaleDateString('th-TH', options);
+
+      // 2. Update Greeting based on Time
+      const greetEl = document.getElementById('dash-greeting');
+      const hour = now.getHours();
+      let greeting = "สวัสดี";
+      if (hour >= 5 && hour < 12) greeting = "สวัสดีตอนเช้า";
+      else if (hour >= 12 && hour < 17) greeting = "สวัสดีตอนบ่าย";
+      else if (hour >= 17 && hour < 21) greeting = "สวัสดีตอนเย็น";
+      else greeting = "ราตรีสวัสดิ์";
+      
+      if(greetEl) greetEl.innerText = greeting;
+
+      // 3. User name will be updated by script.html's logic
+    })();
+  </script>
+
+  <style>
+    /* Custom Scrollbar for Recent List */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9; 
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1; 
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8; 
+    }
+    
+    /* Animation helper */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+  </style>
+
+</div>

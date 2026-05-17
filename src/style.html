@@ -1,0 +1,129 @@
+<script src="https://cdn.tailwindcss.com"></script>
+<link
+  href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600&display=swap"
+  rel="stylesheet">
+
+
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Sarabun', 'sans-serif'],
+          display: ['Kanit', 'sans-serif'],
+        },
+        colors: {
+          primary: {
+            50: '#f0f9ff',
+            100: '#e0f2fe',
+            500: '#0ea5e9', // Sky Blue
+            600: '#0284c7',
+            700: '#0369a1',
+            900: '#0c4a6e',
+          },
+          secondary: '#f59e0b', // Amber/Gold for awards
+        },
+        animation: {
+          'spin-slow': 'spin 3s linear infinite',
+          'bounce-slight': 'bounce 2s infinite',
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  /* Global Styles */
+  body {
+    background-color: #f3f4f6;
+    overflow-x: hidden;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Glassmorphism Utilities */
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* Global Loading Overlay */
+  #global-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.9);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    transition: opacity 0.3s ease;
+  }
+
+  #global-loader.hidden {
+    display: none !important;
+  }
+
+  /* Loader Animation */
+  .loader-spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #e2e8f0;
+    border-bottom-color: #0ea5e9;
+    /* Primary Color */
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+  }
+
+  @keyframes rotation {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Image Aspect Ratio Container */
+  .aspect-w-3 {
+    position: relative;
+    padding-bottom: 75%;
+    /* 4:3 Aspect Ratio */
+  }
+
+  .aspect-w-3>img {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  /* Masonry Grid Fallback logic handled in Tailwind classes, 
+     but specific tweaks can go here */
+</style>

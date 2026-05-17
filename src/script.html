@@ -1,0 +1,976 @@
+<script>
+  // --- STATE MANAGEMENT ---
+  var currentUser = null; 
+  var allAchievements = []; 
+  var dashboardChart = null;
+  var globalConfig = { SchoolYear: '2568', CurrentTerm: '2' }; 
+
+  // --- INITIALIZATION ---
+  document.addEventListener('DOMContentLoaded', function() {
+    var storedUser = localStorage.getItem('school_app_user');
+    if (storedUser) {
+      try {
+        currentUser = JSON.parse(storedUser);
+        updateAuthUI(); 
+      } catch (e) {
+        console.error("Session restore error:", e);
+        localStorage.removeItem('school_app_user'); 
+      }
+    }
+    loadSystemConfig();
+    loadGalleryData();
+  });
+
+  // --- API HELPER ---
+  function runGoogleScript(funcName, args) {
+    return new Promise(function(resolve, reject) {
+      var params = Array.isArray(args) ? args : [args];
+      if (args === undefined) params = [];
+      var runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject);
+      runner[funcName].apply(runner, params);
+    });
+  }
+
+  // --- LOADING FEEDBACK ---
+  function showLoading() {
+    var loader = document.getElementById('global-loader');
+    if (loader) loader.classList.remove('hidden');
+  }
+
+  function hideLoading() {
+    var loader = document.getElementById('global-loader');
+    if (loader) loader.classList.add('hidden');
+  }
+
+  // --- NAVIGATION (SPA) ---
+  function navigateTo(pageId) {
+    var views = document.querySelectorAll('.page-view');
+    for (var i = 0; i < views.length; i++) {
+      views[i].classList.add('hidden');
+    }
+    
+    var target = document.getElementById('view-' + pageId);
+    if(target) {
+      target.classList.remove('hidden');
+      
+      if(pageId === 'dashboard') {
+        loadDashboardData();
+      }
+      if(pageId === 'app') {
+        loadTableData();
+      }
+      if(pageId === 'landing') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }
+
+  function scrollToGallery() {
+    var gallery = document.getElementById('gallery-section');
+    if(gallery) gallery.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // --- CONFIGURATION LOGIC ---
+  function loadSystemConfig() {
+    google.script.run.withSuccessHandler(function(res) {
+        if(res.status === 'success') {
+            globalConfig = res.data;
+            updateDashboardTerm();
+        }
+    }).getSystemConfig();
+  }
+
+  function updateDashboardTerm() {
+    var dashTerm = document.getElementById('dash-term-year');
+    if(dashTerm && globalConfig) {
+        dashTerm.innerText = 'ภาคเรียนที่ ' + globalConfig.CurrentTerm + '/' + globalConfig.SchoolYear;
+    }
+  }
+
+  function openYearManager() {
+    closeProfileModal();
+    var modal = document.getElementById('year-manager-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+    
+    if(globalConfig) {
+        document.getElementById('conf-school-year').value = globalConfig.SchoolYear;
+        document.getElementById('conf-current-term').value = globalConfig.CurrentTerm;
+    }
+    
+    if(modal) modal.classList.remove('hidden');
+  }
+
+  function closeYearManager() {
+    document.getElementById('year-manager-modal').classList.add('hidden');
+    openProfileModal(); 
+  }
+
+  function handleYearSubmit(e) {
+    e.preventDefault();
+    var year = document.getElementById('conf-school-year').value;
+    var term = document.getElementById('conf-current-term').value;
+    
+    showLoading();
+    var configData = { SchoolYear: year, CurrentTerm: term };
+    
+    google.script.run.withSuccessHandler(function(res) {
+       hideLoading();
+       if(res.status === 'success') {
+          globalConfig = configData;
+          updateDashboardTerm();
+          closeYearManager();
+          if(window.showToast) showToast('บันทึกค่าปีการศึกษาเรียบร้อย');
+       } else {
+          alert(res.message);
+       }
+    }).withFailureHandler(function(err){ hideLoading(); alert(err); }).saveSystemConfig(configData);
+  }
+
+  // --- AUTH SYSTEM ---
+  function openLoginModal() {
+    if(currentUser) navigateTo('dashboard');
+    else document.getElementById('login-modal').classList.remove('hidden');
+  }
+
+  function closeLoginModal() {
+    document.getElementById('login-modal').classList.add('hidden');
+  }
+
+  function handleLogin(e) {
+    e.preventDefault();
+    var form = e.target;
+    var user = form.username.value;
+    var pass = form.password.value;
+
+    showLoading();
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if(res.status === 'success') {
+          currentUser = res.data;
+          localStorage.setItem('school_app_user', JSON.stringify(currentUser));
+          closeLoginModal();
+          updateAuthUI();
+          navigateTo('dashboard');
+          loadGalleryData(); 
+          if(window.showToast) showToast('เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ' + currentUser.name);
+        } else {
+          alert(res.message);
+        }
+        form.reset();
+      })
+      .withFailureHandler(function(err) {
+        hideLoading();
+        alert("System Error: " + err);
+        form.reset();
+      })
+      .loginUser(user, pass);
+  }
+
+  function logout() {
+    if(confirm('ยืนยันออกจากระบบ?')) {
+      currentUser = null;
+      localStorage.removeItem('school_app_user');
+      updateAuthUI();
+      navigateTo('landing');
+      if(window.showToast) showToast('ออกจากระบบเรียบร้อยแล้ว');
+    }
+  }
+
+  function updateAuthUI() {
+    var container = document.getElementById('auth-menu-container');
+    var dashName = document.getElementById('dash-user-name');
+    if(dashName) dashName.innerText = currentUser ? currentUser.name : 'คุณครู';
+
+    var btnAdmin = document.getElementById('btn-admin-manage');
+    var btnYear = document.getElementById('btn-year-manage');
+    if(btnAdmin && btnYear) {
+       if(currentUser && currentUser.role === 'admin') {
+           btnAdmin.classList.remove('hidden');
+           btnYear.classList.remove('hidden');
+       } else {
+           btnAdmin.classList.add('hidden');
+           btnYear.classList.add('hidden');
+       }
+    }
+
+    if(currentUser) {
+      var html = '<button onclick="navigateTo(\'dashboard\')" class="text-slate-600 hover:text-primary-600 font-medium text-sm mr-4">Dashboard</button>';
+      html += '<button onclick="navigateTo(\'app\')" class="text-slate-600 hover:text-primary-600 font-medium text-sm mr-4">จัดการข้อมูล</button>';
+      html += '<div class="relative inline-block text-left group">';
+      html += '   <button onclick="openProfileModal()" class="flex items-center gap-2 focus:outline-none">';
+      html += '     <img src="' + currentUser.image + '" class="w-8 h-8 rounded-full border border-slate-200 object-cover">';
+      html += '     <span class="text-sm font-medium text-slate-700 hidden md:inline">' + currentUser.name + '</span>';
+      html += '   </button>';
+      html += '</div>';
+      container.innerHTML = html;
+      
+      var mobileIcon = document.getElementById('mobile-auth-icon');
+      if(mobileIcon) {
+         mobileIcon.innerHTML = '<button onclick="openProfileModal()" class="p-0.5 rounded-full border-2 border-white shadow-sm active:scale-95 transition-transform"><img src="' + currentUser.image + '" class="w-8 h-8 rounded-full object-cover"></button>';
+      }
+    } else {
+      container.innerHTML = '<button onclick="openLoginModal()" class="px-5 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5">เข้าสู่ระบบครู</button>';
+      
+      var mobileIcon = document.getElementById('mobile-auth-icon');
+      if(mobileIcon) {
+         mobileIcon.innerHTML = '<button onclick="openLoginModal()" class="p-2.5 text-slate-500 hover:text-primary-600 bg-slate-100 hover:bg-primary-50 rounded-full transition-colors active:scale-95"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></button>';
+      }
+    }
+  }
+
+  function openProfileModal() {
+    if(!currentUser) return;
+    var modal = document.getElementById('profile-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+
+    var elName = document.getElementById('prof-name');
+    var elRole = document.getElementById('prof-role');
+    var elImg = document.getElementById('prof-img');
+    
+    if(elName) elName.innerText = currentUser.name;
+    if(elRole) elRole.innerText = currentUser.role;
+    if(elImg) elImg.src = currentUser.image;
+    
+    if(modal) modal.classList.remove('hidden');
+  }
+
+  function closeProfileModal() {
+    document.getElementById('profile-modal').classList.add('hidden');
+  }
+
+  // --- USER MANAGEMENT ---
+  var allUsers = [];
+
+  function openUserManager() {
+    closeProfileModal();
+    var modal = document.getElementById('user-manager-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+    if(modal) modal.classList.remove('hidden');
+    loadUsers();
+  }
+
+  function closeUserManager() {
+    document.getElementById('user-manager-modal').classList.add('hidden');
+    openProfileModal(); 
+  }
+
+  function loadUsers() {
+    showLoading();
+    google.script.run
+      .withSuccessHandler(function(res) {
+         hideLoading();
+         if(res.status === 'success') {
+            allUsers = res.data;
+            renderUserTable(allUsers);
+         }
+      })
+      .withFailureHandler(function(err) {
+         hideLoading();
+         alert("Error loading users: " + err);
+      })
+      .getAllUsers();
+  }
+
+  function renderUserTable(users) {
+    var tbody = document.getElementById('user-list-body');
+    tbody.innerHTML = '';
+    
+    for(var i=0; i<users.length; i++) {
+       var u = users[i];
+       var tr = document.createElement('tr');
+       tr.className = 'hover:bg-slate-50 transition-colors';
+       
+       var roleBadge = u.role === 'admin' 
+          ? '<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Admin</span>'
+          : '<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">Teacher</span>';
+
+       var html = '<td class="px-4 py-3 whitespace-nowrap"><div class="flex items-center"><div class="flex-shrink-0 h-8 w-8"><img class="h-8 w-8 rounded-full object-cover" src="' + u.image + '"></div><div class="ml-4"><div class="text-sm font-medium text-slate-900">' + u.name + '</div><div class="text-xs text-slate-500">' + u.username + '</div></div></div></td>';
+       html += '<td class="px-4 py-3 whitespace-nowrap">' + roleBadge + '</td>';
+       html += '<td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium"><button onclick="editUser(\'' + u.username + '\')" class="text-indigo-600 hover:text-indigo-900 mr-2">แก้ไข</button><button onclick="deleteUserFunc(\'' + u.username + '\')" class="text-red-600 hover:text-red-900">ลบ</button></td>';
+       
+       tr.innerHTML = html;
+       tbody.appendChild(tr);
+    }
+  }
+
+  function openUserForm(user) {
+    var modal = document.getElementById('user-form-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+    
+    document.getElementById('user-form-title').innerText = user ? 'แก้ไขผู้ใช้งาน' : 'เพิ่มผู้ใช้งาน';
+    document.getElementById('uf-is-edit').value = user ? 'true' : 'false';
+    document.getElementById('uf-username').value = user ? user.username : '';
+    document.getElementById('uf-username').readOnly = !!user; 
+    document.getElementById('uf-password').value = user ? user.password : '';
+    document.getElementById('uf-name').value = user ? user.name : '';
+    document.getElementById('uf-role').value = user ? user.role : 'teacher';
+    document.getElementById('uf-file').value = ''; 
+
+    if(modal) modal.classList.remove('hidden');
+  }
+
+  function closeUserForm() {
+    document.getElementById('user-form-modal').classList.add('hidden');
+  }
+
+  function editUser(username) {
+    var user = allUsers.find(function(u) { return u.username === username; });
+    if(user) openUserForm(user);
+  }
+
+  function deleteUserFunc(username) {
+    if(username === 'admin' || username === currentUser.username) {
+       alert("ไม่สามารถลบบัญชีนี้ได้");
+       return;
+    }
+    if(!confirm('ยืนยันการลบผู้ใช้ ' + username + '?')) return;
+    
+    showLoading();
+    google.script.run.withSuccessHandler(function(res) {
+       hideLoading();
+       if(res.status === 'success') {
+          loadUsers();
+          if(window.showToast) showToast('ลบผู้ใช้เรียบร้อย');
+       } else alert(res.message);
+    }).withFailureHandler(function(err){ hideLoading(); alert(err); }).deleteUser(username);
+  }
+
+  function handleUserSubmit(e) {
+    e.preventDefault();
+    var isEdit = document.getElementById('uf-is-edit').value === 'true';
+    var username = document.getElementById('uf-username').value;
+    var password = document.getElementById('uf-password').value;
+    var name = document.getElementById('uf-name').value;
+    var role = document.getElementById('uf-role').value;
+    var fileInput = document.getElementById('uf-file');
+    
+    showLoading();
+    
+    function send(fileData) {
+       var payload = {
+          isEdit: isEdit,
+          username: username,
+          password: password,
+          name: name,
+          role: role,
+          imageFile: fileData,
+          image: isEdit ? allUsers.find(function(u){return u.username===username}).image : null
+       };
+       
+       google.script.run.withSuccessHandler(function(res) {
+          hideLoading();
+          if(res.status === 'success') {
+             closeUserForm();
+             loadUsers();
+             if(window.showToast) showToast('บันทึกข้อมูลผู้ใช้เรียบร้อย');
+          } else {
+             alert(res.message);
+          }
+       }).withFailureHandler(function(err){ hideLoading(); alert(err); }).saveUser(payload);
+    }
+
+    if (fileInput.files && fileInput.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(evt) { 
+           send({ data: evt.target.result, name: fileInput.files[0].name, mimeType: fileInput.files[0].type }); 
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+    } else {
+        send(null);
+    }
+  }
+
+  // --- EDIT PROFILE & PASS ---
+  function openEditProfileModal() {
+    closeProfileModal();
+    var modal = document.getElementById('edit-profile-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+    
+    document.getElementById('edit-name').value = currentUser.name;
+    document.getElementById('edit-img-preview-container').classList.add('hidden');
+    document.getElementById('edit-img-placeholder').classList.remove('hidden');
+    
+    if(modal) modal.classList.remove('hidden');
+  }
+
+  function closeEditProfileModal() {
+    document.getElementById('edit-profile-modal').classList.add('hidden');
+    openProfileModal(); 
+  }
+
+  function previewEditImage(input) {
+    if (input.files && input.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('edit-img-preview').src = e.target.result;
+        document.getElementById('edit-img-preview-container').classList.remove('hidden');
+        document.getElementById('edit-img-placeholder').classList.add('hidden');
+      }
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function handleEditProfile(e) {
+    e.preventDefault();
+    var newName = document.getElementById('edit-name').value;
+    var fileInput = document.getElementById('edit-file');
+    
+    showLoading();
+    
+    function sendEdit(imgBase64) {
+       google.script.run
+        .withSuccessHandler(function(res) {
+           hideLoading();
+           if(res.status === 'success') {
+              currentUser.name = res.data.name;
+              currentUser.image = res.data.image;
+              localStorage.setItem('school_app_user', JSON.stringify(currentUser));
+              
+              updateAuthUI();
+              closeEditProfileModal();
+              if(window.showToast) showToast('บันทึกข้อมูลเรียบร้อย');
+           } else {
+              alert(res.message);
+           }
+        })
+        .withFailureHandler(function(err) {
+           hideLoading();
+           alert("Error: " + err);
+        })
+        .updateUserProfile(currentUser.username, newName, imgBase64);
+    }
+
+    if (fileInput.files && fileInput.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(evt) { sendEdit(evt.target.result); };
+        reader.readAsDataURL(fileInput.files[0]);
+    } else {
+        sendEdit(null);
+    }
+  }
+
+  function openChangePasswordModal() {
+    closeProfileModal();
+    var modal = document.getElementById('change-password-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+    if(modal) modal.classList.remove('hidden');
+  }
+
+  function closeChangePasswordModal() {
+    document.getElementById('change-password-modal').classList.add('hidden');
+    openProfileModal();
+  }
+
+  function handleChangePassword(e) {
+    e.preventDefault();
+    var form = e.target;
+    var oldPass = form.oldPass.value;
+    var newPass = form.newPass.value;
+    var confirmPass = form.confirmPass.value;
+
+    if(newPass !== confirmPass) {
+       alert("รหัสผ่านใหม่ไม่ตรงกัน");
+       return;
+    }
+
+    showLoading();
+    google.script.run
+      .withSuccessHandler(function(res) {
+         hideLoading();
+         if(res.status === 'success') {
+            closeChangePasswordModal();
+            if(window.showToast) showToast('เปลี่ยนรหัสผ่านเรียบร้อย');
+            form.reset();
+         } else {
+            alert(res.message);
+         }
+      })
+      .withFailureHandler(function(err) {
+         hideLoading();
+         alert("Error: " + err);
+      })
+      .changeUserPassword(currentUser.username, oldPass, newPass);
+  }
+
+  // --- FILTER & DASHBOARD ---
+  function checkOwnership(item) {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+
+    // Check createdBy (Strict match)
+    if (item.createdBy) {
+        if (String(item.createdBy).trim().toLowerCase() === String(currentUser.username).trim().toLowerCase()) {
+            return true;
+        }
+    }
+
+    // Fallback: Check OwnerName vs User Name (Fuzzy match)
+    var iName = (item.ownerName || '').trim().toLowerCase();
+    var uName = (currentUser.name || '').trim().toLowerCase();
+    
+    if (iName && uName) {
+         if (iName === uName || iName.includes(uName) || uName.includes(iName)) return true;
+    }
+
+    return false;
+  }
+
+  function filterMyPortfolio() {
+    if(!currentUser) {
+        if(window.showToast) showToast('กรุณาเข้าสู่ระบบก่อนใช้งานเมนูนี้', 'error');
+        else alert('กรุณาเข้าสู่ระบบก่อนใช้งานเมนูนี้');
+        openLoginModal();
+        return;
+    }
+    
+    var myData = allAchievements.filter(checkOwnership);
+    
+    navigateTo('landing');
+    setTimeout(function() {
+        renderGallery(myData);
+        scrollToGallery();
+        
+        var btns = document.querySelectorAll('.filter-btn');
+        btns.forEach(function(btn){ btn.classList.remove('bg-primary-600', 'text-white'); btn.classList.add('bg-white', 'text-slate-600'); });
+        
+        if(myData.length === 0) {
+             if(window.showToast) showToast('ไม่พบรายการที่ตรงกับบัญชีของคุณ (' + currentUser.username + ')', 'error');
+        } else {
+             if(window.showToast) showToast('แสดงผลงานของคุณทั้งหมด (' + myData.length + ' รายการ)');
+        }
+    }, 100);
+  }
+
+  // --- DASHBOARD CHARTS ---
+  function loadDashboardData() {
+    if(!currentUser) return; 
+    
+    var myData = allAchievements.filter(checkOwnership);
+    
+    var totalCount = allAchievements.length;
+    var myCount = myData.length;
+    var nationalCount = allAchievements.filter(function(i) { return i.level.includes('ชาติ'); }).length;
+
+    var elTotal = document.getElementById('stat-total-count');
+    if(elTotal) elTotal.innerText = totalCount;
+    var elMy = document.getElementById('stat-my-count');
+    if(elMy) elMy.innerText = myCount;
+    var elNat = document.getElementById('stat-national-count');
+    if(elNat) elNat.innerText = nationalCount;
+
+    var recentList = document.getElementById('recent-activity-list');
+    if(recentList) {
+      var recentItems = allAchievements.slice(0, 5);
+      var listHtml = '';
+      
+      for(var i=0; i<recentItems.length; i++) {
+        var item = recentItems[i];
+        var imgHtml = item.imageId ? '<img src="https://lh3.googleusercontent.com/d/' + item.imageId + '=s60" class="w-full h-full object-cover">' : '';
+        
+        listHtml += '<li class="pl-6 pb-6 relative">';
+        listHtml += '  <span class="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-slate-200 border-2 border-white"></span>';
+        listHtml += '  <div class="flex items-center gap-3">';
+        listHtml += '    <div class="w-10 h-10 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden">' + imgHtml + '</div>';
+        listHtml += '    <div class="flex-1 min-w-0">';
+        listHtml += '      <p class="text-sm font-medium text-slate-800 truncate">' + item.title + '</p>';
+        listHtml += '      <p class="text-xs text-slate-500">' + formatDateThai(item.date) + '</p>';
+        listHtml += '    </div>';
+        listHtml += '  </div>';
+        listHtml += '</li>';
+      }
+      recentList.innerHTML = listHtml;
+    }
+
+    renderDashboardChart();
+  }
+
+  function renderDashboardChart() {
+    var ctx = document.getElementById('dashboardChart');
+    if(!ctx) return;
+    
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet');
+        return;
+    }
+    
+    var cats = ['นักเรียน', 'ครู', 'ผู้บริหาร', 'โรงเรียน', 'บุคลากร'];
+    var dataCounts = cats.map(function(c) {
+      return allAchievements.filter(function(a) { return a.category === c; }).length;
+    });
+
+    if(dashboardChart) dashboardChart.destroy();
+
+    dashboardChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: cats,
+        datasets: [{
+          data: dataCounts,
+          backgroundColor: ['#3b82f6', '#06b6d4', '#8b5cf6', '#f59e0b', '#10b981'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  }
+
+  // --- GALLERY & APP MAIN ---
+  function loadGalleryData() {
+    google.script.run.withSuccessHandler(function(res) {
+        hideLoading();
+        if(res.status === 'success') {
+          allAchievements = res.data;
+          renderGallery(allAchievements);
+        }
+      }).withFailureHandler(function(err) { hideLoading(); console.error(err); }).getPublicAchievements();
+  }
+
+  function renderGallery(data) {
+    var grid = document.getElementById('public-gallery-grid');
+    var empty = document.getElementById('gallery-empty');
+    if(!grid) return;
+
+    grid.innerHTML = '';
+
+    if(!data || data.length === 0) {
+      if(empty) empty.classList.remove('hidden');
+      return;
+    }
+    if(empty) empty.classList.add('hidden');
+
+    for (var i = 0; i < data.length; i++) {
+      var item = data[i];
+      var imgUrl = item.imageId ? 'https://lh3.googleusercontent.com/d/' + item.imageId + '=w500' : 'https://via.placeholder.com/400x300?text=No+Image';
+      
+      var card = document.createElement('div');
+      card.className = 'bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow group flex flex-col h-full';
+      
+      var html = '<div class="relative aspect-w-3 bg-slate-100 overflow-hidden">';
+      html += '  <img src="' + imgUrl + '" loading="lazy" class="group-hover:scale-105 transition-transform duration-500" alt="' + item.title + '">';
+      html += '  <div class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-bold text-slate-700 shadow-sm">' + item.level + '</div>';
+      html += '  <div class="absolute top-2 left-2 bg-amber-100 text-amber-800 px-2 py-1 rounded-md text-xs font-bold shadow-sm">ปี ' + (item.academicYear || '-') + '</div>';
+      html += '</div>';
+      html += '<div class="p-5 flex-1 flex flex-col">';
+      html += '  <div class="flex items-center gap-2 mb-2">';
+      html += '     <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-primary-50 text-primary-600 uppercase tracking-wide border border-primary-100">' + item.category + '</span>';
+      html += '     <span class="text-xs text-slate-400">• ' + formatDateThai(item.date) + '</span>';
+      html += '  </div>';
+      html += '  <h3 class="text-lg font-bold text-slate-800 leading-tight mb-2 line-clamp-2" title="' + item.title + '">' + item.title + '</h3>';
+      html += '  <p class="text-sm text-slate-500 mb-4 flex-1">ผู้รับ: <span class="font-medium text-slate-700">' + item.ownerName + '</span></p>';
+      html += '</div>';
+
+      card.innerHTML = html;
+      grid.appendChild(card);
+    }
+  }
+
+  function filterGallery(category) {
+    var btns = document.querySelectorAll('.filter-btn');
+    btns.forEach(function(btn) {
+      btn.classList.remove('active', 'bg-primary-600', 'text-white');
+      btn.classList.add('bg-white', 'text-slate-600');
+      if(btn.innerText.includes(category) || (category === 'all' && btn.innerText === 'ทั้งหมด')) {
+         btn.classList.add('bg-primary-600', 'text-white');
+         btn.classList.remove('bg-white', 'text-slate-600');
+      }
+    });
+
+    var searchInput = document.getElementById('gallery-search');
+    var searchVal = searchInput ? searchInput.value.toLowerCase() : '';
+    
+    var filtered = allAchievements.filter(function(item) {
+      var matchCat = category === 'all' ? true : 
+                       (category === 'ระดับชาติ' ? item.level.includes('ชาติ') : item.category === category);
+      var matchSearch = item.title.toLowerCase().includes(searchVal) || item.ownerName.toLowerCase().includes(searchVal);
+      return matchCat && matchSearch;
+    });
+
+    renderGallery(filtered);
+  }
+
+  function searchGallery(val) {
+    var activeBtn = document.querySelector('.filter-btn.bg-primary-600');
+    var currentCat = activeBtn ? (activeBtn.innerText.includes('นักเรียน') ? 'นักเรียน' : activeBtn.innerText.includes('ครู') ? 'ครู' : activeBtn.innerText.includes('ระดับชาติ') ? 'ระดับชาติ' : 'all') : 'all';
+    filterGallery(currentCat);
+  }
+
+  // --- APP / CRUD LOGIC ---
+  function loadTableData() {
+    var totalEl = document.getElementById('total-records');
+    if(totalEl) totalEl.innerText = allAchievements.length;
+    
+    filterAppList(); 
+  }
+
+  function filterAppList() {
+    var searchVal = document.getElementById('app-search');
+    searchVal = searchVal ? searchVal.value.toLowerCase() : '';
+    
+    var filtered = allAchievements.filter(function(item) {
+      return item.title.toLowerCase().includes(searchVal) || 
+             item.ownerName.toLowerCase().includes(searchVal) ||
+             item.category.includes(searchVal);
+    });
+
+    renderAppTable(filtered);
+    renderAppCards(filtered);
+  }
+
+  function renderAppTable(data) {
+    var tbody = document.getElementById('app-table-body');
+    var emptyState = document.getElementById('table-empty-state');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    
+    if(data.length === 0) {
+      if(emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+    if(emptyState) emptyState.classList.add('hidden');
+    
+    for(var i=0; i<data.length; i++) {
+      var item = data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition-colors';
+      
+      var imgUrl = item.imageId ? 'https://lh3.googleusercontent.com/d/' + item.imageId + '=s60' : '';
+      var imgHtml = imgUrl ? '<img class="h-10 w-10 object-cover" src="' + imgUrl + '">' : '<div class="w-full h-full flex items-center justify-center bg-slate-100 text-slate-300"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+      
+      var html = '<td class="px-6 py-4 whitespace-nowrap"><div class="flex-shrink-0 h-10 w-10 bg-slate-100 rounded-lg overflow-hidden border border-slate-100 shadow-sm">' + imgHtml + '</div></td>';
+      html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-semibold text-slate-900 max-w-xs truncate">' + item.title + '</div><div class="text-xs text-slate-500">' + item.ownerName + '</div></td>';
+      html += '<td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 mb-1">' + item.category + '</span> <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 ml-1">ปี ' + (item.academicYear || '-') + '</span><div class="text-xs text-slate-500 mt-1">' + item.level + '</div></td>';
+      html += '<td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">' + formatDateThai(item.date) + '</td>';
+      html += '<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><div class="flex items-center justify-end gap-2"> <button onclick="deleteItem(\'' + item.id + '\')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div></td>';
+
+      tr.innerHTML = html;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderAppCards(data) {
+    var container = document.getElementById('app-mobile-list');
+    if(!container) return;
+    container.innerHTML = '';
+
+    if(data.length === 0) {
+      container.innerHTML = '<div class="text-center py-10 text-slate-400">ไม่พบข้อมูล</div>';
+      return;
+    }
+
+    for(var i=0; i<data.length; i++) {
+      var item = data[i];
+      var imgUrl = item.imageId ? 'https://lh3.googleusercontent.com/d/' + item.imageId + '=s60' : '';
+      var imgHtml = imgUrl ? '<img src="' + imgUrl + '" class="w-full h-full object-cover">' : '<div class="w-full h-full flex items-center justify-center bg-slate-100 text-slate-300"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+
+      var card = document.createElement('div');
+      card.className = 'bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4';
+      
+      var html = '<div class="w-20 h-20 flex-shrink-0 bg-slate-50 rounded-xl overflow-hidden">' + imgHtml + '</div>';
+      html += '<div class="flex-1 min-w-0">';
+      html += '  <div class="flex justify-between items-start">';
+      html += '    <h3 class="text-base font-bold text-slate-800 line-clamp-1 mb-1">' + item.title + '</h3>';
+      html += '  </div>';
+      html += '  <p class="text-xs text-slate-500 mb-2">' + item.ownerName + '</p>';
+      html += '  <div class="flex items-center gap-2 mb-3">';
+      html += '     <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-primary-50 text-primary-600 border border-primary-100">' + item.category + '</span>';
+      html += '     <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">ปี ' + (item.academicYear || '-') + '</span>';
+      html += '     <span class="text-[10px] text-slate-400">' + formatDateThai(item.date) + '</span>';
+      html += '  </div>';
+      
+      html += '  <div class="flex gap-2">';
+      html += '    ';
+      html += '    <button onclick="deleteItem(\'' + item.id + '\')" class="flex-1 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">ลบ</button>';
+      html += '  </div>';
+      html += '</div>';
+
+      card.innerHTML = html;
+      container.appendChild(card);
+    }
+  }
+
+  // --- FORM HANDLING ---
+  function openModal(mode, data) {
+    if(!currentUser) {
+        if(window.showToast) showToast('กรุณาเข้าสู่ระบบก่อนเพิ่มผลงาน', 'error');
+        else alert('กรุณาเข้าสู่ระบบก่อนเพิ่มผลงาน');
+        openLoginModal();
+        return;
+    }
+
+    if(!mode) mode = 'add';
+    // Use unique ID: achievement-modal
+    var modal = document.getElementById('achievement-modal');
+    if(modal && modal.parentNode !== document.body) document.body.appendChild(modal);
+
+    var form = document.getElementById('achievement-form');
+    var title = document.getElementById('modal-title');
+    var imgPrev = document.getElementById('img-preview');
+    var placeholder = document.getElementById('upload-placeholder');
+
+    if(modal) modal.classList.remove('hidden');
+    if(form) form.reset(); 
+    
+    // Set Year
+    var elYear = document.getElementById('inp-academic-year');
+    if(elYear) elYear.value = (globalConfig && globalConfig.SchoolYear) ? globalConfig.SchoolYear : new Date().getFullYear()+543;
+
+    if(mode === 'edit' && data) {
+      if(title) title.innerText = 'แก้ไขข้อมูลรางวัล';
+      document.getElementById('inp-id').value = data.id;
+      document.getElementById('inp-currentImageId').value = data.imageId;
+      document.getElementById('inp-title').value = data.title;
+      document.getElementById('inp-category').value = data.category;
+      document.getElementById('inp-level').value = data.level;
+      document.getElementById('inp-owner').value = data.ownerName;
+      document.getElementById('inp-date').value = data.date; 
+      document.getElementById('inp-desc').value = data.description || '';
+      if(elYear && data.academicYear) elYear.value = data.academicYear;
+
+      if(data.imageId) {
+        imgPrev.src = 'https://lh3.googleusercontent.com/d/' + data.imageId + '=w500';
+        imgPrev.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+      } else {
+        imgPrev.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+      }
+
+    } else {
+      if(title) title.innerText = 'เพิ่มข้อมูลรางวัล';
+      document.getElementById('inp-id').value = '';
+      document.getElementById('inp-currentImageId').value = '';
+      imgPrev.classList.add('hidden');
+      placeholder.classList.remove('hidden');
+    }
+  }
+
+  // Use unique ID: achievement-modal
+  function closeModal() {
+    document.getElementById('achievement-modal').classList.add('hidden');
+  }
+
+  function previewImage(input) {
+    var imgPrev = document.getElementById('img-preview');
+    var placeholder = document.getElementById('upload-placeholder');
+    
+    if (input.files && input.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        imgPrev.src = e.target.result;
+        imgPrev.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+      }
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function deleteItem(id) {
+    if(!confirm("คุณแน่ใจหรือไม่ที่จะลบข้อมูลนี้? การกระทำนี้ไม่สามารถย้อนกลับได้")) return;
+
+    showLoading();
+    google.script.run
+      .withSuccessHandler(function(res) {
+        hideLoading();
+        if(res.status === 'success') {
+          allAchievements = allAchievements.filter(function(x) { return x.id != id; });
+          loadTableData(); 
+          loadDashboardData(); 
+          alert("ลบข้อมูลสำเร็จ");
+        } else {
+          alert("ลบไม่สำเร็จ: " + res.message);
+        }
+      })
+      .withFailureHandler(function(err) {
+        hideLoading();
+        alert("Error: " + err);
+      })
+      .deleteAchievement(id);
+  }
+
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    showLoading();
+
+    var form = e.target;
+    var fileInput = document.getElementById('inp-file');
+    var file = fileInput.files[0];
+    var acYear = document.getElementById('inp-academic-year').value;
+
+    function sendData(fileObj) {
+      var payload = {
+        id: form.id.value,
+        title: form.title.value,
+        category: form.category.value,
+        level: form.level.value,
+        ownerName: form.ownerName.value,
+        date: form.date.value,
+        description: form.description.value,
+        currentImageId: form.currentImageId.value,
+        createdBy: currentUser ? currentUser.username : 'admin',
+        imageFile: fileObj,
+        academicYear: acYear
+      };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hideLoading();
+          if(res.status === 'success') {
+            closeModal();
+            loadGalleryData(); 
+            alert("บันทึกข้อมูลเรียบร้อย");
+            
+            var viewDash = document.getElementById('view-dashboard');
+            if(viewDash && !viewDash.classList.contains('hidden')) {
+               loadDashboardData();
+            }
+
+            var viewApp = document.getElementById('view-app');
+            if(viewApp && !viewApp.classList.contains('hidden')) {
+               setTimeout(loadTableData, 2000); 
+            }
+          } else {
+            alert("บันทึกไม่สำเร็จ: " + res.message);
+          }
+        })
+        .withFailureHandler(function(err) {
+          hideLoading();
+          alert("Error: " + err);
+        })
+        .handleAchievementSave(payload);
+    }
+
+    if (file) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var base64 = e.target.result; 
+        sendData({
+          name: file.name,
+          mimeType: file.type,
+          data: base64
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      sendData(null); 
+    }
+  }
+
+  // --- UTILS ---
+  function formatDateThai(dateStr) {
+    if(!dateStr) return "-";
+    var date = new Date(dateStr);
+    if(isNaN(date.getTime())) return dateStr;
+    var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+    return date.getDate() + ' ' + months[date.getMonth()] + ' ' + (date.getFullYear() + 543);
+  }
+</script>
